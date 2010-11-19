@@ -1,0 +1,20 @@
+# This contains a list of all systems which take part in the backup system.
+# Also, it describes how to reach them.
+
+# This is the simplest form.
+# It just uses the default SSH port, direct connection
+# and root user.
+server.az2000.de
+
+# This will tunnel through server.az2000.de and connect with hcompneu.
+server.az2000.de . hcompneu
+
+# Non-standard SSH port but direct connection.
+134.130.188.25:12022
+
+# Tunnel through to samba host.
+134.130.188.3 . samba
+
+# Some other host.
+az-acompneu.dyndns.org
+
