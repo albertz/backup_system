@@ -1,6 +1,8 @@
 # This contains a list of all systems which take part in the backup system.
 # Also, it describes how to reach them.
 
+# TODO: directory/disk specifications
+
 # This is the simplest form.
 # It just uses the default SSH port, direct connection
 # and root user.
