@@ -18,3 +18,9 @@ For each type (i.e. in the specific associated directory, e.g. "Pictures"), ther
 
 A single entity is always handled as a single object; it cannot be separated. (To do that, you could just create 2 or more new entities, copy the stuff over there and delete the original entity.)
 
+
+Basic operations
+----------------
+
+- create new project / base directory
+- split an entity into several sub-entities. i.e. push the entity root-dir one down
