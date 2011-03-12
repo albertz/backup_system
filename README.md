@@ -26,3 +26,4 @@ Basic operations
 
 - create new project / base directory
 - split an entity into several sub-entities. i.e. push the entity root-dir one down
+
