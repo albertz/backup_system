@@ -1,1 +1,4 @@
 * move one dir/entity somewhere else
+* remove single files
+ Hard to track because they are just away and we don't really know when they
+ were deleted.
