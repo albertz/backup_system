@@ -34,6 +34,7 @@ info = [
 "Genre",
 "Time length",
 "Rating",
+"Geo location",
 ]
 
 locals().update(map(lambda n: (makeSymbolName(n),n), info))

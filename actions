@@ -2,3 +2,5 @@
 * remove single files
  Hard to track because they are just away and we don't really know when they
  were deleted.
+* take iPhone/whatever location info by time and link with
+  file creation/modification times. use as guess for geo location info
