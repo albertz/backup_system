@@ -20,10 +20,20 @@ def makeSymbolName(name):
 	return ret
 
 info = [
-"Name",
+"File name",
+"File type",
+"File size",
+"Content",
 "Date changed",
 "Date accessed",
 "Date created",
+"Author",
+"Artist",
+"Album",
+"Name",
+"Genre",
+"Time length",
+"Rating",
 ]
 
 locals().update(map(lambda n: (makeSymbolName(n),n), info))
