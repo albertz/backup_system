@@ -67,9 +67,6 @@ def json_decode(s):
 def get_db_obj(ref):
 	pass
 
-def should_we_recheck_dir(d, dbobj):
-	pass
-
 def convert_statmode_to_list(m):
 	bitlist = []
 	import stat
@@ -121,7 +118,9 @@ def get_file_info(fpath):
 
 def need_to_check(dbobj, fileinfo):
 	if dbobj is None: return True
-	
+	assert isinstance(dbobj.time.lastmodification, Time)
+	assert isinstance(fileinfo.time.lastmodification, Time)
+	return fileinfo.time.lastmodification > dbobj.time.lastmodification
 
 def checkfile(fpath):
 	assert type(fpath) is unicode
@@ -130,7 +129,7 @@ def checkfile(fpath):
 
 	obj = get_db_obj(sha1(fpath))
 	fileinfo = get_file_info(fpath)
-	
+	if not need_to_check(obj, fileinfo): return
 	
 	print fpath, json_encode(fileinfo)
 
