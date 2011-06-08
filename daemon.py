@@ -54,12 +54,13 @@ def should_we_recheck_dir(d, dbobj):
 def convert_statmode_to_list(m):
 	bitlist = []
 	import stat
-	for b in dir(stat):
-		if not b.startswith("S_"): continue
+	for b in sorted(dir(stat)):
+		if not b.startswith("S_I"): continue
+		if b in ["S_IREAD", "S_IWRITE", "S_IEXEC"]: continue # synoyms
 		if callable(getattr(stat, b)): continue
 		i = getattr(stat, b)
 		if m & i == 0: continue
-		bitlist += [b]
+		bitlist += [b[3:]]
 	return bitlist
 
 def convert_stat_info__into(s, o):
