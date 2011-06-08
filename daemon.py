@@ -38,6 +38,9 @@ class Time(datetime):
 	@classmethod
 	def from_unix(cls, unixtime):
 		return cls(*datetime.utcfromtimestamp(unixtime).utctimetuple()[0:6])
+	@classmethod
+	def from_str(cls, s):
+		return cls(*datetime.strptime("%Y-%m-%d %H:%M:%S", s).utctimetuple()[0:6])
 	def str(self): return self.isoformat(" ")
 	
 def _json_encode_obj(obj):
@@ -48,8 +51,18 @@ def _json_encode_obj(obj):
 def json_encode(obj):
 	return json.dumps(obj, ensure_ascii=False, indent=4, default=_json_encode_obj, sort_keys=True)
 
+def _json_decode_obj(obj):
+	if isinstance(obj, (str,unicode)):
+		try: return Time.from_str(obj)
+		except: pass
+	return obj
+
+def _json_decode_dict(d):
+	d = dict(map(lambda (k,v): (k,_json_decode_obj(v)), d.iteritems()))
+	return SimpleStruct(d)
+
 def json_decode(s):
-	return json.loads(s, object_hook=SimpleStruct)
+	return json.loads(s, object_hook=_json_decode_dict)
 
 def get_db_obj(ref):
 	pass
