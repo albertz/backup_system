@@ -34,8 +34,15 @@ class SimpleStruct:
 	
 	def get(self, attr, fallback=None): return getattr(self, attr, fallback)
 
+class Time(datetime):
+	@classmethod
+	def from_unix(cls, unixtime):
+		return cls(*datetime.utcfromtimestamp(unixtime).utctimetuple()[0:6])
+	def str(self): return self.isoformat(" ")
+	
 def _json_encode_obj(obj):
 	if isinstance(obj, SimpleStruct): return obj.as_dict()
+	if isinstance(obj, Time): return str(obj)
 	raise TypeError, repr(obj) + " cannot be serialized"
 
 def json_encode(obj):
@@ -73,9 +80,6 @@ def convert_statmode_to_list(m):
 
 	return bitlist
 
-def convert_unix_time(unixtime):
-	return datetime.utcfromtimestamp(unixtime).isoformat(" ")
-
 def get_stat_info(fpath):
 	s = os.lstat(fpath)
 	o = SimpleStruct()
@@ -83,7 +87,7 @@ def get_stat_info(fpath):
 	o.size = s.st_size
 	for a in ["atime", "mtime", "ctime", "birthtime"]:
 		if hasattr(s, "st_" + a):
-			setattr(o, a, convert_unix_time(getattr(s, "st_" + a)))
+			setattr(o, a, Time.from_unix(getattr(s, "st_" + a)))
 	return o
 
 def _file_type_from_statmodelist(s):
@@ -102,17 +106,24 @@ def get_file_info(fpath):
 	elif o.type == "file:lnk": o.symlink = os.readlink(fpath)
 	return o
 
+def need_to_check(dbobj, fileinfo):
+	if dbobj is None: return True
+	
+
 def checkfile(fpath):
 	assert type(fpath) is unicode
 
 	if os.path.samestat(os.lstat(fpath), os.stat(config.dbdir)): return
-	obj = get_db_obj(sha1(fpath))
 
+	obj = get_db_obj(sha1(fpath))
 	fileinfo = get_file_info(fpath)
+	
+	
 	print fpath, json_encode(fileinfo)
 
 	if fileinfo.type == "dir":
 		for e in os.listdir(fpath):
+			time.sleep(1)
 			checkfile(fpath + "/" + e)
 	elif fileinfo.type == "file":
 		# TODO
