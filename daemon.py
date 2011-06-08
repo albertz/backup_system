@@ -35,9 +35,15 @@ class SimpleStruct:
 	def as_dict(self):
 		return dict(map(lambda a: (a, getattr(self, a)), self.attribs()))
 
-def json_encode(obj):
+def _json_encode_obj(obj):
 	if isinstance(obj, SimpleStruct): return obj.as_dict()
 	raise TypeError, repr(obj) + " cannot be serialized"
+
+def json_encode(obj):
+	return json.dumps(obj, default=_json_encode_obj)
+
+def json_decode(s):
+	return json.loads(s, object_hook=SimpleStruct)
 
 def get_db_obj(ref):
 	pass
@@ -45,18 +51,32 @@ def get_db_obj(ref):
 def should_we_recheck_dir(d, dbobj):
 	pass
 
-def convert_stat_info(s):
-	o = SimpleStruct()
-	#o.mode = TODO
+def convert_statmode_to_list(m):
+	bitlist = []
+	import stat
+	for b in dir(stat):
+		if not b.startswith("S_"): continue
+		if callable(getattr(stat, b)): continue
+		i = getattr(stat, b)
+		if m & i == 0: continue
+		bitlist += [b]
+	return bitlist
+
+def convert_stat_info__into(s, o):
+	o.mode = convert_statmode_to_list(s.st_mode)
 	o.size = s.st_size
-	for a in ["atime", "mtime", "ctime"]:
-		setattr(o, a, convert_unix_time(getattr(s, "st_" + a)))
+	for a in ["atime", "mtime", "ctime", "birthtime"]:
+		if hasattr(s, "st_" + a):
+			setattr(o, a, convert_unix_time(getattr(s, "st_" + a)))
 	return o
+
+def convert_stat_info(s):
+	return convert_stat_info__into(s, SimpleStruct())
 
 def checkdir(d):
 	if os.path.samefile(d, config.dbdir): return
 	obj = get_db_obj(sha1(d))
-	print d, convert_stat_info(os.stat(d))
+	print d, json_encode(convert_stat_info(os.stat(d)))
 	
 def mainloop():
 	while True:
