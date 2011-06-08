@@ -97,6 +97,7 @@ def get_file_info(fpath):
 	o.time.creation = o.stat.get("birthtime") or o.stat.get("ctime")
 	o.time.lastmodification = o.stat.mtime
 	o.type = _file_type_from_statmodelist(o.stat.mode)
+	if o.type == "lnk": o.symlink = os.readlink(fpath)
 	return o
 
 def checkdir(d):
