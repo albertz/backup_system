@@ -61,7 +61,7 @@ def convert_statmode_to_list(m):
 		if b in ["S_IREAD", "S_IWRITE", "S_IEXEC"]: continue # synoyms
 		if callable(getattr(stat, b)): continue
 		i = getattr(stat, b)
-		if m & i == 0: continue
+		if m & i != i: continue
 		bitlist += [b[3:]]
 	return bitlist
 
