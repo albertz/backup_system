@@ -34,13 +34,15 @@ class SimpleStruct:
 
 	def as_dict(self):
 		return dict(map(lambda a: (a, getattr(self, a)), self.attribs()))
+	
+	def get(self, attr, fallback=None): return getattr(self, attr, fallback)
 
 def _json_encode_obj(obj):
 	if isinstance(obj, SimpleStruct): return obj.as_dict()
 	raise TypeError, repr(obj) + " cannot be serialized"
 
 def json_encode(obj):
-	return json.dumps(obj, default=_json_encode_obj)
+	return json.dumps(obj, ensure_ascii=False, indent=4, default=_json_encode_obj, sort_keys=True)
 
 def json_decode(s):
 	return json.loads(s, object_hook=SimpleStruct)
@@ -63,7 +65,9 @@ def convert_statmode_to_list(m):
 		bitlist += [b[3:]]
 	return bitlist
 
-def convert_stat_info__into(s, o):
+def get_stat_info(fpath):
+	s = os.stat(fpath)
+	o = SimpleStruct()
 	o.mode = convert_statmode_to_list(s.st_mode)
 	o.size = s.st_size
 	for a in ["atime", "mtime", "ctime", "birthtime"]:
@@ -71,13 +75,18 @@ def convert_stat_info__into(s, o):
 			setattr(o, a, convert_unix_time(getattr(s, "st_" + a)))
 	return o
 
-def convert_stat_info(s):
-	return convert_stat_info__into(s, SimpleStruct())
+def get_file_info(fpath):
+	o = SimpleStruct()
+	o.stat = get_stat_info(fpath)
+	o.time = SimpleStruct()
+	o.time.creation = o.stat.get("birthtime") or o.stat.get("ctime")
+	o.time.lastmodification = o.stat.mtime
+	return o
 
 def checkdir(d):
 	if os.path.samefile(d, config.dbdir): return
 	obj = get_db_obj(sha1(d))
-	print d, json_encode(convert_stat_info(os.stat(d)))
+	print d, json_encode(get_file_info(d))
 	
 def mainloop():
 	while True:
