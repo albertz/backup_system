@@ -96,20 +96,35 @@ def get_file_info(fpath):
 	o.time = SimpleStruct()
 	o.time.creation = o.stat.get("birthtime") or o.stat.get("ctime")
 	o.time.lastmodification = o.stat.mtime
-	o.type = _file_type_from_statmodelist(o.stat.mode)
-	if o.type == "lnk": o.symlink = os.readlink(fpath)
+	o.type = "file:" + _file_type_from_statmodelist(o.stat.mode)
+	if o.type == "file:reg": o.type = "file"
+	elif o.type == "file:dir": o.type = "dir"
+	elif o.type == "file:lnk": o.symlink = os.readlink(fpath)
 	return o
 
-def checkdir(d):
-	if os.path.samestat(os.lstat(d), os.stat(config.dbdir)): return
-	obj = get_db_obj(sha1(d))
-	print d, json_encode(get_file_info(d))
+def checkfile(fpath):
+	assert type(fpath) is unicode
+
+	if os.path.samestat(os.lstat(fpath), os.stat(config.dbdir)): return
+	obj = get_db_obj(sha1(fpath))
+
+	fileinfo = get_file_info(fpath)
+	print fpath, json_encode(fileinfo)
+
+	if fileinfo.type == "dir":
+		for e in os.listdir(fpath):
+			checkfile(fpath + "/" + e)
+	elif fileinfo.type == "file":
+		# TODO
+		pass
+	
 	
 def mainloop():
 	while True:
 		time.sleep(1)
 		for d in config.dirs:
-			checkdir(d)
+			if type(d) is str: d = d.decode("utf-8")
+			checkfile(d)
 		quit()
 		
 if __name__ == '__main__':
