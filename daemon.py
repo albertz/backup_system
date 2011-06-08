@@ -53,14 +53,24 @@ def should_we_recheck_dir(d, dbobj):
 def convert_statmode_to_list(m):
 	bitlist = []
 	import stat
+
+	hastype = False
+	for t in ["LNK", "DIR", "REG", "FIFO", "SOCK", "CHR", "BLK"]:
+		if getattr(stat, "S_IS" + t)(m):
+			bitlist += ["F" + t]
+			hastype = True
+			break
+		
 	for b in sorted(dir(stat)):
 		if not b.startswith("S_I"): continue
 		if b == "S_IFMT": continue # collection
+		if hastype and b.startswith("S_IF"): continue # we already have the type
 		if b in ["S_IREAD", "S_IWRITE", "S_IEXEC"]: continue # synoyms
 		if callable(getattr(stat, b)): continue
 		i = getattr(stat, b)
 		if m & i != i: continue
 		bitlist += [b[3:]]
+
 	return bitlist
 
 def convert_unix_time(unixtime):
