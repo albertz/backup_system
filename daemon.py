@@ -8,9 +8,6 @@ from hashlib import sha1
 import json
 from datetime import datetime
 
-def convert_unix_time(unixtime):
-	return datetime.utcfromtimestamp(unixtime).isoformat(" ")
-
 class SimpleStruct:
 	def __init__(self, *args, **kwargs):
 		if len(kwargs) == 0 and len(args) == 1 and type(args[0]) is dict:
@@ -58,6 +55,7 @@ def convert_statmode_to_list(m):
 	import stat
 	for b in sorted(dir(stat)):
 		if not b.startswith("S_I"): continue
+		if b == "S_IFMT": continue # collection
 		if b in ["S_IREAD", "S_IWRITE", "S_IEXEC"]: continue # synoyms
 		if callable(getattr(stat, b)): continue
 		i = getattr(stat, b)
@@ -65,8 +63,11 @@ def convert_statmode_to_list(m):
 		bitlist += [b[3:]]
 	return bitlist
 
+def convert_unix_time(unixtime):
+	return datetime.utcfromtimestamp(unixtime).isoformat(" ")
+
 def get_stat_info(fpath):
-	s = os.stat(fpath)
+	s = os.lstat(fpath)
 	o = SimpleStruct()
 	o.mode = convert_statmode_to_list(s.st_mode)
 	o.size = s.st_size
@@ -75,16 +76,21 @@ def get_stat_info(fpath):
 			setattr(o, a, convert_unix_time(getattr(s, "st_" + a)))
 	return o
 
+def _file_type_from_statmodelist(s):
+	for b in s:
+		if b.startswith("F"): return b[1:].lower()
+
 def get_file_info(fpath):
 	o = SimpleStruct()
 	o.stat = get_stat_info(fpath)
 	o.time = SimpleStruct()
 	o.time.creation = o.stat.get("birthtime") or o.stat.get("ctime")
 	o.time.lastmodification = o.stat.mtime
+	o.type = _file_type_from_statmodelist(o.stat.mode)
 	return o
 
 def checkdir(d):
-	if os.path.samefile(d, config.dbdir): return
+	if os.path.samestat(os.lstat(d), os.stat(config.dbdir)): return
 	obj = get_db_obj(sha1(d))
 	print d, json_encode(get_file_info(d))
 	
