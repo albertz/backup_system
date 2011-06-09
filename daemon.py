@@ -44,12 +44,16 @@ class SimpleStruct:
 
 	def dump(self, out=sys.stdout):
 		out.write(json_encode(self).encode("utf-8"))
+		out.write("\n")
+		out.flush()
 		
 	def save_to_db(self):
 		dbfilepath = config.dbdir + "/objects/" + self.sha1[:2] + "/" + self.sha1[2:]
 		try: os.makedirs(os.path.dirname(dbfilepath))
 		except: pass # eg, dir exists or so. doesn't matter, the following will fail if it is more serious
-		open(dbfilepath, "w").write(json_encode(self).encode("utf-8"))
+		f = open(dbfilepath, "w")
+		self.dump(out=f)
+		f.close()
 	
 	@staticmethod
 	def load_from_db(sha1ref):
@@ -164,12 +168,18 @@ def _check_entry__file(dbobj):
 	
 def _check_entry__dir(dbobj):
 	assert dbobj.type == "dir"
+	clean_entries_to_check__with_parentref(dbobj.sha1)
+	
 	for e in os.listdir(dbobj.path):
-		checkfilepath(dbobj.path + "/" + e)
+		checkfilepath(dbobj.path + "/" + e, dbobj)
 
 def _check_entry__file_lnk(dbobj):
 	# do nothing
 	pass
+
+def clean_entries_to_check__with_parentref(parentref):
+	global entries_to_check
+	entries_to_check = filter(lambda obj: obj.parent != parentref, entries_to_check)
 
 def add_entry_to_check(dbobj):
 	global entries_to_check
@@ -187,15 +197,16 @@ def need_to_check(dbobj, fileinfo):
 	assert isinstance(dbobj.time.lastmodification, Time)
 	assert isinstance(fileinfo.time.lastmodification, Time)
 	if fileinfo.time.lastmodification > dbobj.time.lastmodification: return True
-	assert fileinfo == dbobj
+	# we cannot assert fileinfo==dbobj. atime and other stuff might still have changed
 	return False
 
-def checkfilepath(fpath):
+def checkfilepath(fpath, parentobj):
 	assert type(fpath) is unicode
 
 	if os.path.samestat(os.lstat(fpath), os.stat(config.dbdir)): return
 
 	fileinfo = get_file_info(fpath)
+	fileinfo.parent = parentobj.sha1 if parentobj is not None else None		
 	obj = get_db_obj(fileinfo.sha1)
 	if not need_to_check(obj, fileinfo):
 		print "skipped:", fpath
@@ -217,7 +228,7 @@ def mainloop():
 			time.sleep(1)
 			for d in config.dirs:
 				if type(d) is str: d = d.decode("utf-8")
-				checkfilepath(d)
+				checkfilepath(d, None)
 		
 if __name__ == '__main__':
 	mainloop()
