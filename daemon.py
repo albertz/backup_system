@@ -89,7 +89,12 @@ def json_decode(s):
 entries_to_check = []
 
 def get_db_obj(sha1ref):
-	return SimpleStruct.load_from_db(sha1ref)
+	try:
+		return SimpleStruct.load_from_db(sha1ref)
+	except IOError, e:
+		if e.errno == 2: # no such file or dir
+			return None
+		raise e # reraise, we didn't expected that
 
 def convert_statmode_to_list(m):
 	bitlist = []
