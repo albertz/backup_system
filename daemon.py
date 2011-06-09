@@ -2,9 +2,7 @@
 
 import config
 
-import codecs
-import time
-import os
+import time, os, sys
 import hashlib
 import json
 from datetime import datetime
@@ -44,9 +42,13 @@ class SimpleStruct:
 	
 	def get(self, attr, fallback=None): return getattr(self, attr, fallback)
 
+	def dump(self, out=sys.stdout):
+		out.write(json_encode(self).encode("utf-8"))
+		
 	def save_to_db(self):
 		dbfilepath = config.dbdir + "/objects/" + self.sha1[:2] + "/" + self.sha1[2:]
-		os.makedirs(os.path.dirname(dbfilepath))
+		try: os.makedirs(os.path.dirname(dbfilepath))
+		except: pass # eg, dir exists or so. doesn't matter, the following will fail if it is more serious
 		open(dbfilepath, "w").write(json_encode(self).encode("utf-8"))
 	
 	@staticmethod
@@ -61,7 +63,7 @@ class Time(datetime):
 		return cls(*datetime.utcfromtimestamp(unixtime).utctimetuple()[0:6])
 	@classmethod
 	def from_str(cls, s):
-		return cls(*datetime.strptime("%Y-%m-%d %H:%M:%S", s).utctimetuple()[0:6])
+		return cls(*datetime.strptime(s, "%Y-%m-%d %H:%M:%S").utctimetuple()[0:6])
 	def str(self): return self.isoformat(" ")
 	
 def _json_encode_obj(obj):
@@ -156,12 +158,6 @@ def get_file_info(fpath):
 	elif o.type == "file:lnk": o.symlink = os.readlink(fpath)
 	return o
 
-def need_to_check(dbobj, fileinfo):
-	if dbobj is None: return True
-	assert isinstance(dbobj.time.lastmodification, Time)
-	assert isinstance(fileinfo.time.lastmodification, Time)
-	return fileinfo.time.lastmodification > dbobj.time.lastmodification
-
 def _check_entry__file(dbobj):
 	assert dbobj.type == "file"
 	# TODO
@@ -186,6 +182,14 @@ def check_entry(dbobj):
 	f = globals()[checkfuncname]
 	f(dbobj)
 
+def need_to_check(dbobj, fileinfo):
+	if dbobj is None: return True
+	assert isinstance(dbobj.time.lastmodification, Time)
+	assert isinstance(fileinfo.time.lastmodification, Time)
+	if fileinfo.time.lastmodification > dbobj.time.lastmodification: return True
+	assert fileinfo == dbobj
+	return False
+
 def checkfilepath(fpath):
 	assert type(fpath) is unicode
 
@@ -193,8 +197,11 @@ def checkfilepath(fpath):
 
 	fileinfo = get_file_info(fpath)
 	obj = get_db_obj(fileinfo.sha1)
-	if not need_to_check(obj, fileinfo): return
+	if not need_to_check(obj, fileinfo):
+		print "skipped:", fpath
+		return
 	
+	fileinfo.save_to_db()
 	add_entry_to_check(fileinfo)
 	
 def mainloop():
