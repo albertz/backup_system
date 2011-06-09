@@ -195,6 +195,12 @@ def check_entry(dbobj):
 	f = globals()[checkfuncname]
 	f(dbobj)
 
+	if dbobj.childs_to_check_count == 0:
+		if dbobj.parent is not None:
+			parent = get_db_obj(dbobj.parent)
+			assert parent is not None
+			parent.childs_to_check_count -= 1
+	
 def need_to_check(dbobj, fileinfo):
 	if dbobj is None: return True
 	assert isinstance(dbobj.time.lastmodification, Time)
