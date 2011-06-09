@@ -192,11 +192,11 @@ def _check_entry__file_lnk(dbobj):
 def db_obj__parent_chain(dbobj):
 	if dbobj.parent is None: return []
 	parent = get_db_obj(dbobj.parent)
-	return db_obj_parent_chain(parent) + [parent]
+	return db_obj__parent_chain(parent) + [parent]
 
 def db_obj__ref(dbobj): return dbobj.sha1
 
-def db_obj__parentref_chain(dbobj): return map(db_obj__ref, db_obj__parent_chain())
+def db_obj__parentref_chain(dbobj): return map(db_obj__ref, db_obj__parent_chain(dbobj))
 
 def clean_entries_to_check__with_parentref(parentref):
 	global entries_to_check
