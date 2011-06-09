@@ -189,34 +189,49 @@ def _check_entry__file_lnk(dbobj):
 	dbobj.childs_to_check_count = 0
 	dbobj.save_to_db()
 
+def db_obj__parent_chain(dbobj):
+	if dbobj.parent is None: return []
+	parent = get_db_obj(dbobj.parent)
+	return db_obj_parent_chain(parent) + [parent]
+
+def db_obj__ref(dbobj): return dbobj.sha1
+
+def db_obj__parentref_chain(dbobj): return map(db_obj__ref, db_obj__parent_chain())
+
 def clean_entries_to_check__with_parentref(parentref):
 	global entries_to_check
-	entries_to_check = filter(lambda obj: obj.parent != parentref, entries_to_check)
+	entries_to_check = filter(lambda obj: parentref not in db_obj__parentref_chain(obj), entries_to_check)
 
 def add_entry_to_check(dbobj):
 	global entries_to_check
 	entries_to_check += [dbobj]
 
+def _check_entry__is_complete(dbobj):
+	return dbobj.childs_to_check_count == 0
+
 def check_entry(dbobj):
 	print json_encode(dbobj)
+	was_complete = _check_entry__is_complete(dbobj)
+	
 	checkfuncname = "_check_entry__" + dbobj.type
 	checkfuncname = checkfuncname.replace(":","_")
 	f = globals()[checkfuncname]
 	f(dbobj)
 
-	if dbobj.childs_to_check_count == 0:
+	if not was_complete and _check_entry__is_complete(dbobj):
 		if dbobj.parent is not None:
 			parent = get_db_obj(dbobj.parent)
 			assert parent is not None
 			parent.childs_to_check_count -= 1
-	
+			assert parent.childs_to_check_count >= 0
+			
 def need_to_check(dbobj, fileinfo):
 	if dbobj is None: return True
 	assert isinstance(dbobj.time.lastmodification, Time)
 	assert isinstance(fileinfo.time.lastmodification, Time)
 	if fileinfo.time.lastmodification > dbobj.time.lastmodification: return True
 	if fileinfo.type != dbobj.type: return True
-	if dbobj.get("childs_to_check_count", 1) > 0: return True
+	if dbobj.childs_to_check_count > 0: return True
 	# we cannot assert fileinfo==dbobj. atime and other stuff might still have changed
 	return False
 
