@@ -14,6 +14,15 @@ def sha1(s):
 	if type(s) is unicode: s = s.encode("utf-8")
 	return hashlib.sha1(s).hexdigest()
 
+def db_obj_fpath(sha1ref):
+	# Splitting the 160 bit into 8:8:144 bit.
+	# For a complete uniform distribution of 10**6 entries, it means that there are
+	# 255 sub-directories on the first level,
+	# 255 sub-directories on the second level and
+	# 15.4 files at the last level.
+	# Git just splits 8:152 which means a somewhat worse performance at 10**7 entries and up.
+	return config.dbdir + "/objects/" + sha1ref[:2] + "/" + sha1ref[2:4] + "/" + sha1ref[4:]
+
 class SimpleStruct:
 	def __init__(self, *args, **kwargs):
 		if len(kwargs) == 0 and len(args) == 1 and type(args[0]) is dict:
@@ -48,7 +57,7 @@ class SimpleStruct:
 		out.flush()
 		
 	def save_to_db(self):
-		dbfilepath = config.dbdir + "/objects/" + self.sha1[:2] + "/" + self.sha1[2:]
+		dbfilepath = db_obj_fpath(self.sha1)
 		try: os.makedirs(os.path.dirname(dbfilepath))
 		except: pass # eg, dir exists or so. doesn't matter, the following will fail if it is more serious
 		f = open(dbfilepath, "w")
@@ -57,7 +66,7 @@ class SimpleStruct:
 	
 	@staticmethod
 	def load_from_db(sha1ref):
-		dbfilepath = config.dbdir + "/objects/" + sha1ref[:2] + "/" + sha1ref[2:]
+		dbfilepath = db_obj_fpath(sha1ref)
 		return json_decode(open(dbfilepath).read())
 
 	
