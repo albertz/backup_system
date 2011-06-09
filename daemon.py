@@ -180,12 +180,14 @@ def _check_entry__dir(dbobj):
 	clean_entries_to_check__with_parentref(dbobj.sha1)
 	files = list(os.listdir(dbobj.path))
 	dbobj.childs_to_check_count = len(files)
+	if len(files) == 0: dbobj.info_completed = True
 	dbobj.save_to_db()
 	for e in files:
 		checkfilepath(dbobj.path + "/" + e, dbobj)
 
 def _check_entry__file_lnk(dbobj):
 	# do nothing
+	dbobj.info_completed = True
 	dbobj.childs_to_check_count = 0
 	dbobj.save_to_db()
 
@@ -206,9 +208,6 @@ def add_entry_to_check(dbobj):
 	global entries_to_check
 	entries_to_check += [dbobj]
 
-def _check_entry__is_complete(dbobj):
-	return dbobj.childs_to_check_count == 0
-
 def _check_entry__handle_completion(dbobj):
 	if dbobj.parent is not None:
 		parent = get_db_obj(dbobj.parent)
@@ -220,23 +219,24 @@ def _check_entry__handle_completion(dbobj):
 
 def check_entry(dbobj):
 	print json_encode(dbobj)
-	was_complete = _check_entry__is_complete(dbobj)
+	was_complete = dbobj.info_completed
 	
 	checkfuncname = "_check_entry__" + dbobj.type
 	checkfuncname = checkfuncname.replace(":","_")
 	f = globals()[checkfuncname]
 	f(dbobj)
 
-	if not was_complete and _check_entry__is_complete(dbobj):
+	if not was_complete and dbobj.info_completed:
 		_check_entry__handle_completion(dbobj)
 
 def need_to_check(dbobj, fileinfo):
 	if dbobj is None: return True
 	assert isinstance(dbobj.time.lastmodification, Time)
 	assert isinstance(fileinfo.time.lastmodification, Time)
+	if not fileinfo.info_completed: return True
+	if dbobj.childs_to_check_count > 0: return True
 	if fileinfo.time.lastmodification > dbobj.time.lastmodification: return True
 	if fileinfo.type != dbobj.type: return True
-	if dbobj.childs_to_check_count > 0: return True
 	# we cannot assert fileinfo==dbobj. atime and other stuff might still have changed
 	return False
 
@@ -252,6 +252,7 @@ def checkfilepath(fpath, parentobj):
 		print "skipped:", fpath
 		return
 	
+	fileinfo.info_completed = False
 	fileinfo.childs_to_check_count = 1 # there is at least one child: the content of this filepath entry
 	fileinfo.save_to_db()
 	add_entry_to_check(fileinfo)
