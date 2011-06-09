@@ -209,6 +209,15 @@ def add_entry_to_check(dbobj):
 def _check_entry__is_complete(dbobj):
 	return dbobj.childs_to_check_count == 0
 
+def _check_entry__handle_completion(dbobj):
+	if dbobj.parent is not None:
+		parent = get_db_obj(dbobj.parent)
+		assert parent is not None
+		parent.childs_to_check_count -= 1
+		assert parent.childs_to_check_count >= 0
+		if parent.childs_to_check_count == 0:
+			_check_entry__handle_completion(parent)
+
 def check_entry(dbobj):
 	print json_encode(dbobj)
 	was_complete = _check_entry__is_complete(dbobj)
@@ -219,12 +228,8 @@ def check_entry(dbobj):
 	f(dbobj)
 
 	if not was_complete and _check_entry__is_complete(dbobj):
-		if dbobj.parent is not None:
-			parent = get_db_obj(dbobj.parent)
-			assert parent is not None
-			parent.childs_to_check_count -= 1
-			assert parent.childs_to_check_count >= 0
-			
+		_check_entry__handle_completion(dbobj)
+
 def need_to_check(dbobj, fileinfo):
 	if dbobj is None: return True
 	assert isinstance(dbobj.time.lastmodification, Time)
