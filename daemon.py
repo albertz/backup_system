@@ -169,13 +169,16 @@ def _check_entry__file(dbobj):
 def _check_entry__dir(dbobj):
 	assert dbobj.type == "dir"
 	clean_entries_to_check__with_parentref(dbobj.sha1)
-	
-	for e in os.listdir(dbobj.path):
+	files = list(os.listdir(dbobj.path))
+	dbobj.childs_to_check_count = len(files)
+	dbobj.save_to_db()
+	for e in files:
 		checkfilepath(dbobj.path + "/" + e, dbobj)
 
 def _check_entry__file_lnk(dbobj):
 	# do nothing
-	pass
+	dbobj.childs_to_check_count = 0
+	dbobj.save_to_db()
 
 def clean_entries_to_check__with_parentref(parentref):
 	global entries_to_check
@@ -197,6 +200,8 @@ def need_to_check(dbobj, fileinfo):
 	assert isinstance(dbobj.time.lastmodification, Time)
 	assert isinstance(fileinfo.time.lastmodification, Time)
 	if fileinfo.time.lastmodification > dbobj.time.lastmodification: return True
+	if fileinfo.type != dbobj.type: return True
+	if dbobj.get("childs_to_check_count", 1) > 0: return True
 	# we cannot assert fileinfo==dbobj. atime and other stuff might still have changed
 	return False
 
@@ -212,6 +217,7 @@ def checkfilepath(fpath, parentobj):
 		print "skipped:", fpath
 		return
 	
+	fileinfo.childs_to_check_count = 1 # there is at least one child: the content of this filepath entry
 	fileinfo.save_to_db()
 	add_entry_to_check(fileinfo)
 	
