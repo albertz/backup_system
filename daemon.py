@@ -9,6 +9,9 @@ import hashlib
 import json
 from datetime import datetime
 
+import better_exchook
+better_exchook.install()
+
 def sha1(s):
 	if type(s) is unicode: s = s.encode("utf-8")
 	return hashlib.sha1(s).hexdigest()
