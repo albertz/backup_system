@@ -182,8 +182,11 @@ def _check_entry__dir(dbobj):
 	dbobj.childs_to_check_count = len(files)
 	if len(files) == 0: dbobj.info_completed = True
 	dbobj.save_to_db()
+	dbobj.content = {}
 	for e in files:
-		checkfilepath(dbobj.path + "/" + e, dbobj)
+		ref = checkfilepath(dbobj.path + "/" + e, dbobj)
+		dbobj.content[e] = ref
+	dbobj.save_to_db()	
 
 def _check_entry___nop(dbobj):
 	# do nothing
@@ -256,13 +259,14 @@ def checkfilepath(fpath, parentobj):
 	obj = get_db_obj(fileinfo.sha1)
 	if not need_to_check(obj, fileinfo):
 		print "skipped:", fpath
-		return
+		return fileinfo.sha1
 	
 	fileinfo.info_completed = False
 	fileinfo.childs_to_check_count = 1 # there is at least one child: the content of this filepath entry
 	fileinfo.save_to_db()
 	add_entry_to_check(fileinfo)
-	
+	return fileinfo.sha1
+
 def mainloop():
 	global entries_to_check
 	import random
