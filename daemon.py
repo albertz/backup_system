@@ -34,16 +34,16 @@ def db_obj_fpath(sha1ref):
 	# Git just splits 8:152 which means a somewhat worse performance at 10**7 entries and up.
 	return config.dbdir + "/objects/" + sha1ref[:2] + "/" + sha1ref[2:4] + "/" + sha1ref[4:]
 
-class SimpleStruct:
+class SimpleStruct(dict):
 	def __init__(self, *args, **kwargs):
 		if len(kwargs) == 0 and len(args) == 1 and type(args[0]) is dict:
 			kwargs = args[0]
+		self.__dict__ = self
 		for k,v in kwargs.iteritems():
-			setattr(self, k, v)
+			self[k] = v
 	
 	def attribs(self):
-		stdobjattribs = set(dir(object()))
-		stdobjattribs.add("__module__")
+		stdobjattribs = set(dir(self.__class__()))
 		attribs = []
 		for a in dir(self):
 			if a in stdobjattribs: continue
