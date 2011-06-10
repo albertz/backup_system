@@ -266,7 +266,7 @@ def need_to_check(dbobj, fileinfo):
 	if dbobj is None: return True
 	assert isinstance(dbobj.time.lastmodification, Time)
 	assert isinstance(fileinfo.time.lastmodification, Time)
-	if not fileinfo.info_completed: return True
+	if not dbobj.info_completed: return True
 	if dbobj.childs_to_check_count > 0: return True
 	if fileinfo.time.lastmodification > dbobj.time.lastmodification: return True
 	if fileinfo.type != dbobj.type: return True
