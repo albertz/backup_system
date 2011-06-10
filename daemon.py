@@ -182,10 +182,22 @@ def get_file_info(fpath):
 	elif o.type == "file:lnk": o.symlink = os.readlink(fpath)
 	return o
 
+def create_file_content_obj(contentsha1, filetype):
+	obj = SimpleStruct()
+	obj.sha1 = contentsha1
+	obj.type = "file content"
+	obj.filetype = filetype
+	obj.paths = {}
+	return obj
+
 def _check_entry__file(dbobj):
 	assert dbobj.type == "file"
 	dbobj.content = sha1file(dbobj.path) # TODO: error handling here. e.g. no access
-	
+	dbobj.save_to_db()
+	contentobj = get_db_obj(dbobj.content) or create_file_content_obj(dbobj.content, dbobj.filetype)
+	if dbobj.path not in contentobj.paths: contentobj.paths[dbobj.path] = dbobj.sha1
+	contentobj.save_to_db()
+	_check_entry_finish_entry(dbobj)
 	
 def _check_entry__dir(dbobj):
 	assert dbobj.type == "dir"
@@ -248,7 +260,7 @@ def check_entry(dbobj):
 	f(dbobj)
 
 	if not was_complete and dbobj.info_completed:
-		_check_entry__handle_completion(dbobj)
+		_check_entry_handle_completion(dbobj)
 
 def need_to_check(dbobj, fileinfo):
 	if dbobj is None: return True
