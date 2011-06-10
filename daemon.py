@@ -15,6 +15,7 @@ def sha1(s):
 	return hashlib.sha1(s).hexdigest()
 
 def sha1file(f, close_at_end=True):
+	if type(f) in [str,unicode]: f = open(f)
 	hash = hashlib.sha1()
 	while True:
 		buf = f.read(0x1000000) # read 16MB chunks
@@ -183,7 +184,8 @@ def get_file_info(fpath):
 
 def _check_entry__file(dbobj):
 	assert dbobj.type == "file"
-	# TODO
+	dbobj.content = sha1file(dbobj.path) # TODO: error handling here. e.g. no access
+	
 	
 def _check_entry__dir(dbobj):
 	assert dbobj.type == "dir"
@@ -198,17 +200,17 @@ def _check_entry__dir(dbobj):
 		dbobj.content[e] = ref
 	dbobj.save_to_db()	
 
-def _check_entry___nop(dbobj):
-	# do nothing
+def _check_entry_finish_entry(dbobj):
 	dbobj.info_completed = True
 	dbobj.childs_to_check_count = 0
 	dbobj.save_to_db()
 
-_check_entry__file_lnk = _check_entry___nop
-_check_entry__file_fifo = _check_entry___nop
-_check_entry__file_sock = _check_entry___nop
-_check_entry__file_chr = _check_entry___nop
-_check_entry__file_blk = _check_entry___nop
+# do nothing
+_check_entry__file_lnk = _check_entry_finish_entry
+_check_entry__file_fifo = _check_entry_finish_entry
+_check_entry__file_sock = _check_entry_finish_entry
+_check_entry__file_chr = _check_entry_finish_entry
+_check_entry__file_blk = _check_entry_finish_entry
 
 def db_obj__parent_chain(dbobj):
 	if dbobj.parent is None: return []
@@ -227,14 +229,14 @@ def add_entry_to_check(dbobj):
 	global entries_to_check
 	entries_to_check += [dbobj]
 
-def _check_entry__handle_completion(dbobj):
+def _check_entry_handle_completion(dbobj):
 	if dbobj.parent is not None:
 		parent = get_db_obj(dbobj.parent)
 		assert parent is not None
 		parent.childs_to_check_count -= 1
 		assert parent.childs_to_check_count >= 0
 		if parent.childs_to_check_count == 0:
-			_check_entry__handle_completion(parent)
+			_check_entry_handle_completion(parent)
 
 def check_entry(dbobj):
 	print json_encode(dbobj)
