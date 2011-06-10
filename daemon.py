@@ -35,31 +35,25 @@ def db_obj_fpath(sha1ref):
 	return config.dbdir + "/objects/" + sha1ref[:2] + "/" + sha1ref[2:4] + "/" + sha1ref[4:]
 
 class SimpleStruct(dict):
+	# Note: We cannot do `self.__dict__ = self` because of http://bugs.python.org/issue1469629.
+	# But anyway, redefining __getattr__/__setattr__ has also the advantage
+	# that `self.__dict__` and `self` are not the same which makes it a bit cleaner.
+
 	def __init__(self, *args, **kwargs):
 		if len(kwargs) == 0 and len(args) == 1 and type(args[0]) is dict:
 			kwargs = args[0]
-		self.__dict__ = self
 		for k,v in kwargs.iteritems():
 			self[k] = v
 	
-	def attribs(self):
-		stdobjattribs = set(dir(self.__class__()))
-		attribs = []
-		for a in dir(self):
-			if a in stdobjattribs: continue
-			if callable(getattr(self, a)): continue
-			attribs += [a]		
-		return attribs
-	
-	def as_dict(self):
-		return dict(map(lambda a: (a, getattr(self, a)), self.attribs()))
+	attribs = dict.keys
+	as_dict = lambda self: self
 
 	def __repr__(self):
-		return self.__class__.__name__ + "(" + ", ".join(map(
-			lambda a: a + "=" + repr(getattr(self, a)), self.attribs())) + ")"
-
-	def __eq__(self, other): return self.as_dict() == other.as_dict()
+		return self.__class__.__name__ + "(" + dict.__repr__(self) + ")"
 	
+	def __getattr__(self, key): return self[key]
+	def __setattr__(self, key, value): self[key] = value
+
 	def get(self, attr, fallback=None): return getattr(self, attr, fallback)
 
 	def dump(self, out=sys.stdout):
