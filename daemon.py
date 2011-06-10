@@ -14,6 +14,16 @@ def sha1(s):
 	if type(s) is unicode: s = s.encode("utf-8")
 	return hashlib.sha1(s).hexdigest()
 
+def sha1file(f, close_at_end=True):
+	hash = hashlib.sha1()
+	while True:
+		buf = f.read(0x1000000) # read 16MB chunks
+		if not buf:
+			break
+		hash.update(buf)
+	if close_at_end: f.close()
+	return hash.hexdigest()
+
 def db_obj_fpath(sha1ref):
 	# Splitting the 160 bit into 8:8:144 bit.
 	# For a complete uniform distribution of 10**6 entries, it means that there are
