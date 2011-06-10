@@ -185,11 +185,17 @@ def _check_entry__dir(dbobj):
 	for e in files:
 		checkfilepath(dbobj.path + "/" + e, dbobj)
 
-def _check_entry__file_lnk(dbobj):
+def _check_entry___nop(dbobj):
 	# do nothing
 	dbobj.info_completed = True
 	dbobj.childs_to_check_count = 0
 	dbobj.save_to_db()
+
+_check_entry__file_lnk = _check_entry___nop
+_check_entry__file_fifo = _check_entry___nop
+_check_entry__file_sock = _check_entry___nop
+_check_entry__file_chr = _check_entry___nop
+_check_entry__file_blk = _check_entry___nop
 
 def db_obj__parent_chain(dbobj):
 	if dbobj.parent is None: return []
