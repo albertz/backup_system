@@ -191,6 +191,11 @@ def _check_entry__file(dbobj):
 	contentobj = get_db_obj(dbobj.content) or create_file_content_obj(dbobj.content, dbobj.filetype)
 	if dbobj.path not in contentobj.paths: contentobj.paths[dbobj.path] = dbobj.sha1
 	contentobj.save_to_db()
+	if dbobj.parent is not None:
+		parentobj = get_db_obj(dbobj.parent)
+		assert parentobj is not None
+		parentobj.content[os.path.basename(dbobj.path)].content = dbobj.content
+		parentobj.save_to_db()
 	_check_entry_finish_entry(dbobj)
 	
 def _check_entry__dir(dbobj):
@@ -203,7 +208,7 @@ def _check_entry__dir(dbobj):
 	dbobj.content = {}
 	for e in files:
 		ref = checkfilepath(dbobj.path + "/" + e, dbobj)
-		dbobj.content[e] = ref
+		dbobj.content[e] = SimpleStruct(path=ref)
 	dbobj.save_to_db()	
 
 def _check_entry_finish_entry(dbobj):
