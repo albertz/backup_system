@@ -65,6 +65,9 @@ class SimpleStruct(dict):
 			assert False # Fail here because of the reason stated above.
 		assert key != "_intern" # We keep this for internal purpose.
 		self[key] = value
+	def __delattr__(self, key):
+		try: self.pop(key)
+		except KeyError: raise AttributeError
 
 	def get(self, attr, fallback=None): return getattr(self, attr, fallback)
 
