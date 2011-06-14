@@ -14,7 +14,8 @@ def debug_open_file(filename, flags, mode=0644):
 	return ret
 
 def debug_close_file(filedes):
-	del debug_open_files[filedes]
+	try: del debug_open_files[filedes]
+	except: pass # Probably KeyError. It may have been opened another way. Ignore any errors.
 	return orig_close(filedes)
 
 import os
