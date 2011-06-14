@@ -54,7 +54,8 @@ class SimpleStruct(dict):
 	
 	def __getattr__(self, key):
 		assert key != "intern" # We shouldn't get here. `_intern` should be in `self.__dict__`.
-		return self[key]
+		try: return self[key]
+		except KeyError: raise AttributeError
 	def __setattr__(self, key, value):
 		if key == "sha1" and "_intern" in self.__dict__:
 			# Once we use intern data, we use this as a DB object.
@@ -74,12 +75,20 @@ class SimpleStruct(dict):
 		else:
 			self[key] = value
 
+	@staticmethod
+	def normalize_value(value):
+		if type(value) is str: value = value.decode("utf-8")
+		if type(value) is dict: value = SimpleStruct(value)
+		return value
+	
 	def merge(self, other):
 		for key, value in other.iteritems():
+			value = self.normalize_value(value)
 			selfvalue = self.get(key)
 			if selfvalue is None:
 				self[key] = value
 			else:
+				selfvalue = self.normalize_value(selfvalue)
 				assert type(value) is type(selfvalue)
 				if isinstance(selfvalue, SimpleStruct):
 					selfvalue.merge(value)
@@ -105,7 +114,7 @@ class SimpleStruct(dict):
 				self._intern.filepath = db_obj_fpath(self.sha1)
 			try: os.makedirs(os.path.dirname(self._intern.filepath))
 			except: pass # eg, dir exists or so. doesn't matter, the following will fail if it is more serious
-			self._intern.fd = os.open(self._intern.filepath, os.O_CREAT | os.O_RDWR | os.O_EXLOCK)
+			self._intern.fd = os.open(self._intern.filepath, flag = os.O_CREAT | os.O_RDWR | os.O_EXLOCK, mode = 0622)
 			assert self._intern.fd >= 0
 			l = os.lseek(self._intern.fd, 0, os.SEEK_END)
 			if load_also and l > 0:
@@ -124,7 +133,7 @@ class SimpleStruct(dict):
 	
 	def _load_file(self):
 		self._assert_open_file()
-		os.lseek(obj._intern.fd, 0, os.SEEK_SET)
+		os.lseek(self._intern.fd, 0, os.SEEK_SET)
 		s = ""
 		while True:
 			buf = os.read(self._intern.fd, 0x1000000) # read 16 MB chunks
@@ -146,13 +155,13 @@ class SimpleStruct(dict):
 
 	def save_to_db(self):
 		self._ensure_open_file(load_also = False) # Either the file should already be loaded or we should fail here.
-		os.lseek(obj._intern.fd, 0, os.SEEK_SET)
-		os.ftruncate(obj._intern.fd, 0)
-		s = json_encode(self).encode("utf-8")
+		os.lseek(self._intern.fd, 0, os.SEEK_SET)
+		os.ftruncate(self._intern.fd, 0)
+		s = json_encode(self).encode("utf-8") + "\n"
 		while len(s) > 0:
-			n = os.write(obj._intern.fd, s)
+			n = os.write(self._intern.fd, s)
 			s = s[n:]
-		os.fsync(obj._intern.fd)
+		os.fsync(self._intern.fd)
 				
 	@staticmethod
 	def load_from_db(sha1ref):
@@ -314,7 +323,7 @@ def db_obj__parentref_chain(dbobj): return map(db_obj__ref, db_obj__parent_chain
 
 def clean_entries_to_check__with_parentref(parentref):
 	global entries_to_check
-	entries_to_check = filter(lambda obj: parentref not in db_obj__parentref_chain(obj), entries_to_check)
+	entries_to_check = filter(lambda ref: parentref not in db_obj__parentref_chain(get_db_obj(ref)), entries_to_check)
 
 def add_entry_to_check(dbobj):
 	global entries_to_check
