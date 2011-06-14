@@ -214,7 +214,36 @@ def json_decode(s):
 	return json.loads(s, object_hook=_json_decode_dict)
 
 
-entries_to_check = []
+class Queue:
+	def __init__(self):
+		import threading
+		self.mutex = threading.Lock()
+		self.list = []
+		
+	def filter_inplace(self, filter_func):
+		self.mutex.acquire()
+		self.list = filter(filter_func, self.list)
+		self.mutex.release()
+	
+	def pop_random(self):
+		import random
+		self.mutex.acquire()
+		if self.list:
+			i = random.randint(0, len(self.list) - 1)
+			entry = self.list[i]
+			self.list = self.list[:i] + self.list[i+1:]
+		else:
+			i = None
+		self.mutex.release()
+		if i is not None: return entry
+		raise IndexError, "empty queue"
+	
+	def add(self, entry):
+		self.mutex.acquire()
+		self.list += [entry]
+		self.mutex.release()
+
+entries_to_check = Queue()
 
 def get_db_obj(sha1ref):
 	return SimpleStruct.load_from_db(sha1ref)
@@ -342,11 +371,11 @@ def db_obj__parentref_chain(dbobj_ref):
 
 def clean_entries_to_check__with_parentref(parentref):
 	global entries_to_check
-	entries_to_check = filter(lambda ref: parentref not in db_obj__parentref_chain(ref), entries_to_check)
+	entries_to_check.filter_inplace(lambda ref: parentref not in db_obj__parentref_chain(ref))
 
 def add_entry_to_check(dbobj_ref):
 	global entries_to_check
-	entries_to_check += [dbobj_ref]
+	entries_to_check.add(dbobj_ref)
 
 def _check_entry_handle_completion(dbobj):
 	if dbobj.parent is not None:
@@ -407,20 +436,18 @@ def checkfilepath(fpath, parentobj):
 
 def mainloop():
 	global entries_to_check
-	import random
 	while True:
-		if entries_to_check:
-			i = random.randint(0, len(entries_to_check) - 1)
-			dbobj_ref = entries_to_check[i]
-			dbobj = get_db_obj(dbobj_ref)
-			entries_to_check = entries_to_check[:i] + entries_to_check[i+1:]
-			check_entry(dbobj)
-			dbobj._close_file()
-		else: # no entries
+		try:
+			dbobj_ref = entries_to_check.pop_random()
+		except: # no entries
 			time.sleep(1)
 			for d in config.dirs:
 				if type(d) is str: d = d.decode("utf-8")
 				checkfilepath(d, None)
+		else:
+			dbobj = get_db_obj(dbobj_ref)
+			check_entry(dbobj)
+			dbobj._close_file()
 		
 if __name__ == '__main__':
 	mainloop()
