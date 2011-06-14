@@ -114,7 +114,7 @@ class SimpleStruct(dict):
 				self._intern.filepath = db_obj_fpath(self.sha1)
 			try: os.makedirs(os.path.dirname(self._intern.filepath))
 			except: pass # eg, dir exists or so. doesn't matter, the following will fail if it is more serious
-			self._intern.fd = os.open(self._intern.filepath, flag = os.O_CREAT | os.O_RDWR | os.O_EXLOCK, mode = 0622)
+			self._intern.fd = os.open(self._intern.filepath, os.O_CREAT | os.O_RDWR | os.O_EXLOCK, 0622)
 			assert self._intern.fd >= 0
 			l = os.lseek(self._intern.fd, 0, os.SEEK_END)
 			if load_also and l > 0:
