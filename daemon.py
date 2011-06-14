@@ -123,7 +123,7 @@ class SimpleStruct(dict):
 				self._intern.filepath = db_obj_fpath(self.sha1)
 			try: os.makedirs(os.path.dirname(self._intern.filepath))
 			except: pass # eg, dir exists or so. doesn't matter, the following will fail if it is more serious
-			assert self._intern.filepath not in opendbfiles
+			if self._intern.filepath in opendbfiles: print "FOO, have to wait..."
 			self._intern.fd = os.open(self._intern.filepath, os.O_CREAT | os.O_RDWR | os.O_EXLOCK, 0644)
 			assert self._intern.fd >= 0
 			opendbfiles[self._intern.filepath] = self._intern.fd
@@ -157,9 +157,9 @@ class SimpleStruct(dict):
 	
 	def _close_file(self):
 		self._assert_open_file()
+		del opendbfiles[self._intern.filepath]
 		os.close(self._intern.fd)
 		del self._intern.fd
-		del opendbfiles[self._intern.filepath]
 		
 	def __del__(self):
 		try:
@@ -488,7 +488,7 @@ if __name__ == '__main__':
 				excinfo = sys.exc_info()
 				def handle_exc():
 					print "Exception in thread", curthread.name
-					#better_exchook.better_exchook(*excinfo)
+					better_exchook.better_exchook(*excinfo, autodebugshell=False)
 				eventqueue.put(handle_exc)
 			def remove_thread(): threads.remove(curthread)
 			eventqueue.put(remove_thread)
