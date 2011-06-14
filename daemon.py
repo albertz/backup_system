@@ -251,6 +251,9 @@ def _file_type_from_statmodelist(s):
 		if b.startswith("F"): return b[1:].lower()
 
 def get_file_mimetype(fpath):
+	import mimetypes
+	out = mimetypes.guess_type(fpath)[0]
+	if out is not None: return out
 	import subprocess
 	out = subprocess.Popen(['file', '-b', '--mime-type', fpath], stdout=subprocess.PIPE).communicate()[0]
 	out = out.strip()
