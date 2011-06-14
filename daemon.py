@@ -36,6 +36,10 @@ def db_obj_fpath(sha1ref):
 	# Git just splits 8:152 which means a somewhat worse performance at 10**7 entries and up.
 	return config.dbdir + "/objects/" + sha1ref[:2] + "/" + sha1ref[2:4] + "/" + sha1ref[4:]
 
+# TODO: Some GCs like the one from PyPy do late deletion. This doesn't really work for us.
+# Find a way to disable late deletion for SimpleStruct objects.
+# For now as a work-around, I have added _close_file() calls everywhere where needed.
+
 class SimpleStruct(dict):
 	# Note: We cannot do `self.__dict__ = self` because of http://bugs.python.org/issue1469629.
 	# But anyway, redefining __getattr__/__setattr__ has also the advantage
@@ -295,11 +299,13 @@ def _check_entry__file(dbobj):
 	create_file_content_obj(contentobj, dbobj.filetype)
 	if dbobj.path not in contentobj.paths: contentobj.paths[dbobj.path] = dbobj.sha1
 	contentobj.save_to_db()
+	contentobj._close_file()
 	if dbobj.parent is not None:
 		parentobj = get_db_obj(dbobj.parent)
 		assert parentobj is not None
 		parentobj.content[os.path.basename(dbobj.path)].content = dbobj.content
 		parentobj.save_to_db()
+		parentobj._close_file()
 	_check_entry_finish_entry(dbobj)
 	
 def _check_entry__dir(dbobj):
@@ -327,22 +333,20 @@ _check_entry__file_sock = _check_entry_finish_entry
 _check_entry__file_chr = _check_entry_finish_entry
 _check_entry__file_blk = _check_entry_finish_entry
 
-def db_obj__parent_chain(dbobj):
-	if dbobj.parent is None: return []
-	parent = get_db_obj(dbobj.parent)
-	return db_obj__parent_chain(parent) + [parent]
-
-def db_obj__ref(dbobj): return dbobj.sha1
-
-def db_obj__parentref_chain(dbobj): return map(db_obj__ref, db_obj__parent_chain(dbobj))
+def db_obj__parentref_chain(dbobj_ref):
+	dbobj = get_db_obj(dbobj_ref)
+	parent_ref = dbobj.parent
+	dbobj._close_file()
+	if parent_ref is None: return []
+	return db_obj__parentref_chain(parent_ref) + [parent_ref]
 
 def clean_entries_to_check__with_parentref(parentref):
 	global entries_to_check
-	entries_to_check = filter(lambda ref: parentref not in db_obj__parentref_chain(get_db_obj(ref)), entries_to_check)
+	entries_to_check = filter(lambda ref: parentref not in db_obj__parentref_chain(ref), entries_to_check)
 
-def add_entry_to_check(dbobj):
+def add_entry_to_check(dbobj_ref):
 	global entries_to_check
-	entries_to_check += [dbobj]
+	entries_to_check += [dbobj_ref]
 
 def _check_entry_handle_completion(dbobj):
 	if dbobj.parent is not None:
@@ -352,6 +356,7 @@ def _check_entry_handle_completion(dbobj):
 		assert parent.childs_to_check_count >= 0
 		if parent.childs_to_check_count == 0:
 			_check_entry_handle_completion(parent)
+		parent._close_file()
 
 def check_entry(dbobj):
 	print json_encode(dbobj)
@@ -386,6 +391,7 @@ def checkfilepath(fpath, parentobj):
 	fileinfo.parent = parentobj.sha1 if parentobj is not None else None		
 	obj = get_db_obj(fileinfo.sha1)
 	if not need_to_check(obj, fileinfo):
+		obj._close_file()
 		print "skipped:", fpath
 		return fileinfo.sha1
 	
@@ -395,7 +401,9 @@ def checkfilepath(fpath, parentobj):
 	fileinfo.childs_to_check_count = 1 # there is at least one child: the content of this filepath entry
 	fileinfo.save_to_db()
 	add_entry_to_check(fileinfo.sha1)
-	return fileinfo.sha1
+	fileref = fileinfo.sha1
+	fileinfo._close_file() # be explicit. For example, PyPys GC doesn't free it directly.
+	return fileref
 
 def mainloop():
 	global entries_to_check
@@ -407,6 +415,7 @@ def mainloop():
 			dbobj = get_db_obj(dbobj_ref)
 			entries_to_check = entries_to_check[:i] + entries_to_check[i+1:]
 			check_entry(dbobj)
+			dbobj._close_file()
 		else: # no entries
 			time.sleep(1)
 			for d in config.dirs:
