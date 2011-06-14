@@ -150,8 +150,12 @@ class SimpleStruct(dict):
 		del self._intern.fd
 
 	def __del__(self):
-		if self._has_opened_file():
-			self._close_file()
+		try:
+			if self._has_opened_file():
+				self._close_file()
+		except:
+			print "SimpleStruct del error:", self, getattr(self, "_intern", None)
+			better_exchook.better_exchook(*sys.exc_info())
 
 	def save_to_db(self):
 		self._ensure_open_file(load_also = False) # Either the file should already be loaded or we should fail here.
