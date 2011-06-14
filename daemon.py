@@ -53,7 +53,7 @@ class SimpleStruct(dict):
 		return self.__class__.__name__ + "(" + dict.__repr__(self) + ")"
 	
 	def __getattr__(self, key):
-		assert key != "intern" # We shouldn't get here. `_intern` should be in `self.__dict__`.
+		assert key != "_intern" # We shouldn't get here. `_intern` should be in `self.__dict__`.
 		try: return self[key]
 		except KeyError: raise AttributeError
 	def __setattr__(self, key, value):
