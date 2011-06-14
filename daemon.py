@@ -37,7 +37,8 @@ def db_obj_fpath(sha1ref):
 class SimpleStruct(dict):
 	# Note: We cannot do `self.__dict__ = self` because of http://bugs.python.org/issue1469629.
 	# But anyway, redefining __getattr__/__setattr__ has also the advantage
-	# that `self.__dict__` and `self` are not the same which makes it a bit cleaner.
+	# that `self.__dict__` and `self` are not the same which allows a cleaner separation
+	# of implementation stuff and the real data.
 
 	def __init__(self, *args, **kwargs):
 		if len(kwargs) == 0 and len(args) == 1 and type(args[0]) is dict:
@@ -51,28 +52,113 @@ class SimpleStruct(dict):
 	def __repr__(self):
 		return self.__class__.__name__ + "(" + dict.__repr__(self) + ")"
 	
-	def __getattr__(self, key): return self[key]
-	def __setattr__(self, key, value): self[key] = value
+	def __getattr__(self, key):
+		assert key != "intern" # We shouldn't get here. `_intern` should be in `self.__dict__`.
+		return self[key]
+	def __setattr__(self, key, value):
+		if key == "sha1" and "_intern" in self.__dict__:
+			# Once we use intern data, we use this as a DB object.
+			# This means we should relate to some DB-file already.
+			# Don't allow this reassignment.
+			assert "sha1" in self # For debugging purpose. This should be True.
+			assert False # Fail here because of the reason stated above.
+		assert key != "_intern" # We keep this for internal purpose.
+		self[key] = value
 
 	def get(self, attr, fallback=None): return getattr(self, attr, fallback)
+
+	def set_initial(self, key, value):
+		if type(value) is dict: value = SimpleStruct(value)
+		if key in self:
+			assert type(self[key]) is type(value)
+		else:
+			self[key] = value
+
+	def merge(self, other):
+		for key, value in other.iteritems():
+			selfvalue = self.get(key)
+			if selfvalue is None:
+				self[key] = value
+			else:
+				assert type(value) is type(selfvalue)
+				if isinstance(selfvalue, SimpleStruct):
+					selfvalue.merge(value)
+				else:
+					self[key] = value
 
 	def dump(self, out=sys.stdout):
 		out.write(json_encode(self).encode("utf-8"))
 		out.write("\n")
 		out.flush()
-		
-	def save_to_db(self):
-		dbfilepath = db_obj_fpath(self.sha1)
-		try: os.makedirs(os.path.dirname(dbfilepath))
-		except: pass # eg, dir exists or so. doesn't matter, the following will fail if it is more serious
-		f = open(dbfilepath, "w")
-		self.dump(out=f)
-		f.close()
 	
+	def _ensure_intern_data(self):
+		if "_intern" not in self.__dict__:
+			self.__dict__["_intern"] = SimpleStruct()
+		
+	def _ensure_open_file(self, load_also):
+		loaded_something = False
+		self._ensure_intern_data()
+		if not self._has_opened_file():
+			if not hasattr(self._intern, "filepath"):
+				assert hasattr(self, "sha1")
+				assert self.sha1 is not None
+				self._intern.filepath = db_obj_fpath(self.sha1)
+			try: os.makedirs(os.path.dirname(self._intern.filepath))
+			except: pass # eg, dir exists or so. doesn't matter, the following will fail if it is more serious
+			self._intern.fd = os.open(self._intern.filepath, os.O_CREAT | os.O_RDWR | os.O_EXLOCK)
+			assert self._intern.fd >= 0
+			l = os.lseek(self._intern.fd, 0, os.SEEK_END)
+			if load_also and l > 0:
+				self._load_file()
+				loaded_something = True
+			else:
+				assert l == 0 # We always should load the file if there is some content.
+		return loaded_something
+	
+	def _has_opened_file(self):
+		return "_intern" in self.__dict__ and hasattr(self._intern, "fd")
+
+	def _assert_open_file(self):
+		assert "_intern" in self.__dict__
+		assert self._intern.fd > 0
+	
+	def _load_file(self):
+		self._assert_open_file()
+		os.lseek(obj._intern.fd, 0, os.SEEK_SET)
+		s = ""
+		while True:
+			buf = os.read(self._intern.fd, 0x1000000) # read 16 MB chunks
+			if len(buf) == 0: break
+			s += buf
+		decodedobj = json_decode(s)
+		assert type(decodedobj) is type(self)
+		self.merge(decodedobj)
+		return decodedobj
+	
+	def _close_file(self):
+		self._assert_open_file()
+		os.close(self._intern.fd)
+		del self._intern.fd
+
+	def __del__(self):
+		if self._has_opened_file():
+			self._close_file()
+
+	def save_to_db(self):
+		self._ensure_open_file(load_also = False) # Either the file should already be loaded or we should fail here.
+		os.lseek(obj._intern.fd, 0, os.SEEK_SET)
+		os.ftruncate(obj._intern.fd, 0)
+		s = json_encode(self).encode("utf-8")
+		while len(s) > 0:
+			n = os.write(obj._intern.fd, s)
+			s = s[n:]
+		os.fsync(obj._intern.fd)
+				
 	@staticmethod
 	def load_from_db(sha1ref):
-		dbfilepath = db_obj_fpath(sha1ref)
-		return json_decode(open(dbfilepath).read())
+		obj = SimpleStruct(sha1 = sha1ref)
+		obj._ensure_open_file(load_also = True)
+		return obj
 
 	
 class Time(datetime):
@@ -109,12 +195,7 @@ def json_decode(s):
 entries_to_check = []
 
 def get_db_obj(sha1ref):
-	try:
-		return SimpleStruct.load_from_db(sha1ref)
-	except IOError, e:
-		if e.errno == 2: # no such file or dir
-			return None
-		raise e # reraise, we didn't expected that
+	return SimpleStruct.load_from_db(sha1ref)
 
 def convert_statmode_to_list(m):
 	bitlist = []
@@ -176,19 +257,18 @@ def get_file_info(fpath):
 	elif o.type == "file:lnk": o.symlink = os.readlink(fpath)
 	return o
 
-def create_file_content_obj(contentsha1, filetype):
-	obj = SimpleStruct()
-	obj.sha1 = contentsha1
+def create_file_content_obj(obj, filetype):
 	obj.type = "file content"
 	obj.filetype = filetype
-	obj.paths = {}
+	obj.set_initial("paths", {})
 	return obj
 
 def _check_entry__file(dbobj):
 	assert dbobj.type == "file"
 	dbobj.content = sha1file(dbobj.path) # TODO: error handling here. e.g. no access
 	dbobj.save_to_db()
-	contentobj = get_db_obj(dbobj.content) or create_file_content_obj(dbobj.content, dbobj.filetype)
+	contentobj = get_db_obj(dbobj.content)
+	create_file_content_obj(contentobj, dbobj.filetype)
 	if dbobj.path not in contentobj.paths: contentobj.paths[dbobj.path] = dbobj.sha1
 	contentobj.save_to_db()
 	if dbobj.parent is not None:
@@ -263,6 +343,7 @@ def check_entry(dbobj):
 
 def need_to_check(dbobj, fileinfo):
 	if dbobj is None: return True
+	if not hasattr(dbobj, "time"): return True
 	assert isinstance(dbobj.time.lastmodification, Time)
 	assert isinstance(fileinfo.time.lastmodification, Time)
 	if not dbobj.info_completed: return True
@@ -284,10 +365,12 @@ def checkfilepath(fpath, parentobj):
 		print "skipped:", fpath
 		return fileinfo.sha1
 	
+	obj.update(fileinfo)
+	fileinfo = obj
 	fileinfo.info_completed = False
 	fileinfo.childs_to_check_count = 1 # there is at least one child: the content of this filepath entry
 	fileinfo.save_to_db()
-	add_entry_to_check(fileinfo)
+	add_entry_to_check(fileinfo.sha1)
 	return fileinfo.sha1
 
 def mainloop():
@@ -296,7 +379,8 @@ def mainloop():
 	while True:
 		if entries_to_check:
 			i = random.randint(0, len(entries_to_check) - 1)
-			dbobj = entries_to_check[i]
+			dbobj_ref = entries_to_check[i]
+			dbobj = get_db_obj(dbobj_ref)
 			entries_to_check = entries_to_check[:i] + entries_to_check[i+1:]
 			check_entry(dbobj)
 		else: # no entries
