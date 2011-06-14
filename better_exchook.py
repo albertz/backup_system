@@ -90,12 +90,49 @@ def grep_full_py_identifiers(tokens):
 		if token[0] in ".0123456789": continue
 		yield token
 
-	
+def set_linecache(filename, source):
+	import linecache
+	linecache.cache[filename] = None, None, [line+'\n' for line in source.splitlines()], filename
+
+def simple_debug_shell(globals, locals):
+	try: import readline
+	except: pass # ignore
+	COMPILE_STRING_FN = "<simple_debug_shell input>"
+	while True:
+		try:
+			s = raw_input("> ")
+		except:
+			print "breaked debug shell:", sys.exc_info()[0].__name__
+			break
+		try:
+			c = compile(s, COMPILE_STRING_FN, "single")
+		except Exception, e:
+			print e.__class__.__name__, ":", str(e), "in", repr(s)
+		else:
+			set_linecache(COMPILE_STRING_FN, s)
+			try:
+				ret = eval(c, globals=globals, locals=locals)
+			except:
+				print "Error executing", repr(s)
+				better_exchook(*sys.exc_info(), autodebugshell=False)
+			else:
+				try:
+					if ret is not None: print ret
+				except:
+					print "Error printing return value of", repr(s)
+					better_exchook(*sys.exc_info(), autodebugshell=False)
+		
 def debug_shell(user_ns, user_global_ns):
-	from IPython.Shell import IPShellEmbed,IPShell
-	ipshell = IPShell(argv=[], user_ns=user_ns, user_global_ns=user_global_ns)
-	#ipshell()
-	ipshell.mainloop()
+	ipshell = None
+	try:
+		from IPython.Shell import IPShellEmbed,IPShell
+		ipshell = IPShell(argv=[], user_ns=user_ns, user_global_ns=user_global_ns)
+	except: pass
+	if ipshell:
+		#ipshell()
+		ipshell.mainloop()
+	else:
+		simple_debug_shell(user_global_ns, user_ns)						
 
 def output(s): print s
 
@@ -139,7 +176,7 @@ def fallback_findfile(filename):
 	if altfn[-4:-1] == ".py": altfn = altfn[:-1] # *.pyc or whatever
 	return altfn
 
-def better_exchook(etype, value, tb):
+def better_exchook(etype, value, tb, debugshell=False, autodebugshell=True):
 	output("EXCEPTION")
 	output('Traceback (most recent call last):')
 	topFrameLocals,topFrameGlobals = None,None
@@ -223,10 +260,10 @@ def better_exchook(etype, value, tb):
 	else:
 		output(_format_final_exc_line(etype.__name__, value))
 
-	debug = False
-	try: debug = int(os.environ["DEBUG"]) != 0
-	except: pass
-	if debug:
+	if autodebugshell:
+		try: debugshell = int(os.environ["DEBUG"]) != 0
+		except: pass
+	if debugshell:
 		output("---------- DEBUG SHELL -----------")
 		debug_shell(user_ns=topFrameLocals, user_global_ns=topFrameGlobals)
 		
