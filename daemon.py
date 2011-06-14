@@ -221,9 +221,18 @@ class Queue:
 		self.list = []
 		
 	def filter_inplace(self, filter_func):
-		self.mutex.acquire()
-		self.list = filter(filter_func, self.list)
-		self.mutex.release()
+		filtered_objs = {}
+		while True:
+			self.mutex.acquire()
+			objs_to_filter = [o for o in self.list if o not in filtered_objs]
+			if objs_to_filter:
+				self.mutex.release()
+				for o in objs_to_filter:
+					filtered_objs[o] = filter_func(o)
+			else:
+				self.list = filter(lambda o: filtered_objs[o], self.list)
+				self.mutex.release()
+				break
 	
 	def pop_random(self):
 		import random
