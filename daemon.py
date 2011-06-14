@@ -450,4 +450,13 @@ def mainloop():
 			dbobj._close_file()
 		
 if __name__ == '__main__':
-	mainloop()
+	multi_threading = True
+	if multi_threading:
+		import threading
+		thread_count = 8
+		for i in xrange(thread_count):
+			t = threading.Thread(target = mainloop)
+			t.daemon = False
+			t.start()
+	else: # no multithreading
+		mainloop()
