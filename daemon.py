@@ -55,7 +55,7 @@ class SimpleStruct(dict):
 	def __getattr__(self, key):
 		assert key != "_intern" # We shouldn't get here. `_intern` should be in `self.__dict__`.
 		try: return self[key]
-		except KeyError: raise AttributeError
+		except KeyError, e: raise AttributeError, str(e)
 	def __setattr__(self, key, value):
 		if key == "sha1" and "_intern" in self.__dict__:
 			# Once we use intern data, we use this as a DB object.
@@ -67,7 +67,7 @@ class SimpleStruct(dict):
 		self[key] = value
 	def __delattr__(self, key):
 		try: self.pop(key)
-		except KeyError: raise AttributeError
+		except KeyError, e: raise AttributeError, str(e)
 
 	def get(self, attr, fallback=None): return getattr(self, attr, fallback)
 
