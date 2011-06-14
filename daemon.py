@@ -34,6 +34,8 @@ def db_obj_fpath(sha1ref):
 	# Git just splits 8:152 which means a somewhat worse performance at 10**7 entries and up.
 	return config.dbdir + "/objects/" + sha1ref[:2] + "/" + sha1ref[2:4] + "/" + sha1ref[4:]
 
+opendbfiles = {}
+
 # TODO: Some GCs like the one from PyPy do late deletion. This doesn't really work for us.
 # Find a way to disable late deletion for SimpleStruct objects.
 # For now as a work-around, I have added _close_file() calls everywhere where needed.
@@ -121,8 +123,10 @@ class SimpleStruct(dict):
 				self._intern.filepath = db_obj_fpath(self.sha1)
 			try: os.makedirs(os.path.dirname(self._intern.filepath))
 			except: pass # eg, dir exists or so. doesn't matter, the following will fail if it is more serious
+			assert self._intern.filepath not in opendbfiles
 			self._intern.fd = os.open(self._intern.filepath, os.O_CREAT | os.O_RDWR | os.O_EXLOCK, 0644)
 			assert self._intern.fd >= 0
+			opendbfiles[self._intern.filepath] = self._intern.fd
 			l = os.lseek(self._intern.fd, 0, os.SEEK_END)
 			if load_also and l > 0:
 				self._load_file()
@@ -155,7 +159,8 @@ class SimpleStruct(dict):
 		self._assert_open_file()
 		os.close(self._intern.fd)
 		del self._intern.fd
-
+		del opendbfiles[self._intern.filepath]
+		
 	def __del__(self):
 		try:
 			if self._has_opened_file():
@@ -440,7 +445,7 @@ def checkfilepath(fpath, parentobj):
 	fileref = fileinfo.sha1
 	fileinfo._close_file() # be explicit. For example, PyPys GC doesn't free it directly.
 	return fileref
-
+	
 def mainloop():
 	global entries_to_check
 	while True:
@@ -459,11 +464,70 @@ def mainloop():
 if __name__ == '__main__':
 	multi_threading = True
 	if multi_threading:
+		
+		def async_raise(thread_ident, exc):
+			import ctypes
+			n = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_ident, id(exc))
+			return n > 0
+		
+		class StopMe(Exception): pass
+
 		import threading
 		thread_count = 8
+		threads = []
+		from Queue import Queue as simplequeue
+		from Queue import Empty
+		eventqueue = simplequeue()
+		
+		def thread_handler():
+			curthread = threading.current_thread()
+			try:
+				mainloop()
+			except StopMe: pass
+			except:
+				excinfo = sys.exc_info()
+				def handle_exc():
+					print "Exception in thread", curthread.name
+					#better_exchook.better_exchook(*excinfo)
+				eventqueue.put(handle_exc)
+			def remove_thread(): threads.remove(curthread)
+			eventqueue.put(remove_thread)
+		
 		for i in xrange(thread_count):
-			t = threading.Thread(target = mainloop)
+			t = threading.Thread(target = thread_handler)
+			t.name = "Thread " + str(i)
 			t.daemon = False
-			t.start()
+			threads.append(t)
+		
+		def dummy_func():
+			while True: time.sleep(1)
+		dummy = threading.Thread(target = dummy_func)
+		dummy.name = "Dummy"
+		dummy.daemon = False
+		threads.append(dummy)
+		
+		def extended_exc_hook(*args):
+			better_exchook.better_exchook(*args)
+			for t in threads:
+				async_raise(t.ident, StopMe())
+			# above doesn't seem to work (yet).
+			# so to be sure:
+			import os
+			os._exit(0)
+		sys.excepthook = extended_exc_hook
+		
+		for t in threads: t.start()
+		
+		while threads:
+			# We have to use timeout because there is no other way to
+			# catch KeyboardInterrupt otherwise.
+			# Stupid Python...
+			try: f = eventqueue.get(timeout=1)
+			except Empty: pass
+			else: f()
+		
+		
+		
+		
 	else: # no multithreading
 		mainloop()
