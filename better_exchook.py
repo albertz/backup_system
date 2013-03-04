@@ -1,7 +1,29 @@
 
-# by Albert Zeyer, www.az2000.de
-# code under GPLv3+
-# 2011-04-15
+# Copyright (c) 2012, Albert Zeyer, www.az2000.de
+# All rights reserved.
+# file created 2011-04-15
+
+
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met: 
+# 
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer. 
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution. 
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 
 # This is a simple replacement for the standard Python exception handler (sys.excepthook).
 # In addition to what the standard handler does, it also prints all referenced variables
@@ -92,45 +114,65 @@ def set_linecache(filename, source):
 
 def simple_debug_shell(globals, locals):
 	try: import readline
-	except: pass # ignore
+	except ImportError: pass # ignore
 	COMPILE_STRING_FN = "<simple_debug_shell input>"
 	while True:
 		try:
 			s = raw_input("> ")
-		except:
-			print "breaked debug shell:", sys.exc_info()[0].__name__
+		except (KeyboardInterrupt, EOFError):
+			print("breaked debug shell: " + sys.exc_info()[0].__name__)
 			break
+		if s.strip() == "": continue
 		try:
 			c = compile(s, COMPILE_STRING_FN, "single")
-		except Exception, e:
-			print e.__class__.__name__, ":", str(e), "in", repr(s)
+		except Exception as e:
+			print("%s : %s in %r" % (e.__class__.__name__, str(e), s))
 		else:
 			set_linecache(COMPILE_STRING_FN, s)
 			try:
-				ret = eval(c, globals=globals, locals=locals)
-			except:
-				print "Error executing", repr(s)
+				ret = eval(c, globals, locals)
+			except (KeyboardInterrupt, SystemExit):
+				print("debug shell exit: " + sys.exc_info()[0].__name__)
+				break
+			except Exception:
+				print("Error executing %r" % s)
 				better_exchook(*sys.exc_info(), autodebugshell=False)
 			else:
 				try:
-					if ret is not None: print ret
+					if ret is not None: print(ret)
 				except:
-					print "Error printing return value of", repr(s)
+					print("Error printing return value of %r" % s)
 					better_exchook(*sys.exc_info(), autodebugshell=False)
 		
-def debug_shell(user_ns, user_global_ns):
+def debug_shell(user_ns, user_global_ns, execWrapper=None):
 	ipshell = None
-	try:
-		from IPython.Shell import IPShellEmbed,IPShell
-		ipshell = IPShell(argv=[], user_ns=user_ns, user_global_ns=user_global_ns)
-	except: pass
+	if not ipshell:
+		# old? doesn't work anymore. but probably has earlier, so leave it
+		try:
+			from IPython.Shell import IPShellEmbed,IPShell
+			ipshell = IPShell(argv=[], user_ns=user_ns, user_global_ns=user_global_ns)
+			ipshell = ipshell.mainloop
+		except Exception: pass
+	if not ipshell:
+		try:
+			import IPython
+			class DummyMod(object): pass
+			module = DummyMod()
+			module.__dict__ = user_global_ns
+			module.__name__ = "DummyMod"
+			ipshell = IPython.frontend.terminal.embed.InteractiveShellEmbed(
+				user_ns=user_ns, user_module=module)
+		except Exception: pass
+		else:
+			if execWrapper:
+				old = ipshell.run_code
+				ipshell.run_code = lambda code: execWrapper(lambda: old(code))
 	if ipshell:
-		#ipshell()
-		ipshell.mainloop()
+		ipshell()
 	else:
 		simple_debug_shell(user_global_ns, user_ns)						
 
-def output(s): print s
+def output(s): print(s)
 
 def output_limit():
 	return 300
@@ -172,10 +214,14 @@ def fallback_findfile(filename):
 	if altfn[-4:-1] == ".py": altfn = altfn[:-1] # *.pyc or whatever
 	return altfn
 
-def better_exchook(etype, value, tb, debugshell=False, autodebugshell=True):
-	output("EXCEPTION")
-	output('Traceback (most recent call last):')
-	topFrameLocals,topFrameGlobals = None,None
+def print_traceback(tb, allLocals=None, allGlobals=None):
+	if tb is None:
+		print "print_traceback: tb is None"
+		return
+	import inspect
+	isframe = inspect.isframe
+	if isframe(tb): output('Traceback (most recent call first)')
+	else: output('Traceback (most recent call last):') # expect traceback-object (or compatible)
 	try:
 		import linecache
 		limit = None
@@ -192,12 +238,15 @@ def better_exchook(etype, value, tb, debugshell=False, autodebugshell=True):
 			if old is not None: return old
 			try: return prefix + func()
 			except KeyError: return old
-			except Exception, e:
+			except Exception as e:
 				return prefix + "!" + e.__class__.__name__ + ": " + str(e)
 		while _tb is not None and (limit is None or n < limit):
-			f = _tb.tb_frame
-			topFrameLocals,topFrameGlobals = f.f_locals,f.f_globals
-			lineno = _tb.tb_lineno
+			if isframe(_tb): f = _tb
+			else: f = _tb.tb_frame
+			if allLocals is not None: allLocals.update(f.f_locals)
+			if allGlobals is not None: allGlobals.update(f.f_globals)
+			if hasattr(_tb, "tb_lineno"): lineno = _tb.tb_lineno
+			else: lineno = f.f_lineno
 			co = f.f_code
 			filename = co.co_filename
 			name = co.co_name
@@ -228,20 +277,28 @@ def better_exchook(etype, value, tb, debugshell=False, autodebugshell=True):
 				if len(alreadyPrintedLocals) == 0: output("       no locals")
 			else:
 				output('    -- code not available --')
-			_tb = _tb.tb_next
+			if isframe(_tb): _tb = _tb.f_back
+			else: _tb = _tb.tb_next
 			n += 1
 
-	except Exception, e:
+	except Exception as e:
 		output("ERROR: cannot get more detailed exception info because:")
 		import traceback
 		for l in traceback.format_exc().split("\n"): output("   " + l)
 		output("simple traceback:")
-		traceback.print_tb(tb)
+		if isframe(tb): traceback.print_stack(tb)
+		else: traceback.print_tb(tb)
+	
 
+def better_exchook(etype, value, tb, debugshell=False, autodebugshell=True):
+	output("EXCEPTION")
+	allLocals,allGlobals = {},{}
+	print_traceback(tb, allLocals=allLocals, allGlobals=allGlobals)
+	
 	import types
 	def _some_str(value):
 		try: return str(value)
-		except: return '<unprintable %s object>' % type(value).__name__
+		except Exception: return '<unprintable %s object>' % type(value).__name__
 	def _format_final_exc_line(etype, value):
 		valuestr = _some_str(value)
 		if value is None or not valuestr:
@@ -250,7 +307,7 @@ def better_exchook(etype, value, tb, debugshell=False, autodebugshell=True):
 			line = "%s: %s" % (etype, valuestr)
 		return line
 	if (isinstance(etype, BaseException) or
-		isinstance(etype, types.InstanceType) or
+		(hasattr(types, "InstanceType") and isinstance(etype, types.InstanceType)) or
 		etype is None or type(etype) is str):
 		output(_format_final_exc_line(etype, value))
 	else:
@@ -261,7 +318,7 @@ def better_exchook(etype, value, tb, debugshell=False, autodebugshell=True):
 		except: pass
 	if debugshell:
 		output("---------- DEBUG SHELL -----------")
-		debug_shell(user_ns=topFrameLocals, user_global_ns=topFrameGlobals)
+		debug_shell(user_ns=allLocals, user_global_ns=allGlobals)
 		
 def install():
 	sys.excepthook = better_exchook
@@ -276,13 +333,13 @@ if __name__ == "__main__":
 			y = "foo"
 			x, 42, sys.stdin.__class__, sys.exc_info, y, z
 		f()
-	except:
+	except Exception:
 		better_exchook(*sys.exc_info())
 
 	try:
 		f = lambda x: None
 		f(x, y)
-	except:
+	except Exception:
 		better_exchook(*sys.exc_info())
 
 	# use this to overwrite the global exception handler
