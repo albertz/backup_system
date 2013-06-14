@@ -1,10 +1,8 @@
-Distributed backup system
-=========================
+# Distributed backup system
 
 General idea: You have a bunch of systems and/or disks and a bunch of data and you want to keep copies / backups of your data on some of those systems/disks.
 
-Structure
----------
+## Structure
 
 I have grouped my data by those general types:
 
@@ -21,9 +19,15 @@ A single entity is always handled as a single object; it cannot be separated. (T
 A database which keeps track over all existing entities. This database may be itself an entity in the whole system.
 
 
-Basic operations
-----------------
+## Basic operations
 
 - create new project / base directory
 - split an entity into several sub-entities. i.e. push the entity root-dir one down
 
+
+## Object types
+
+- A directory. This is also versionized. It contains a list of other objects.
+- A file. This is versionized.
+
+Every object has one or more ids.
