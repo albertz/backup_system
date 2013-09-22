@@ -31,3 +31,9 @@ A database which keeps track over all existing entities. This database may be it
 - A file. This is versionized.
 
 Every object has one or more ids.
+
+
+## Tool
+
+Current status: Single line, updating (on console). E.g.: Currently indexing ...jpg. Or: Graphical status message, also updating itself to latest state.
+
