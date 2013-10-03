@@ -37,3 +37,18 @@ Every object has one or more ids.
 
 Current status: Single line, updating (on console). E.g.: Currently indexing ...jpg. Or: Graphical status message, also updating itself to latest state.
 
+## Different types of data
+
+There is data on different levels, some of it mutable, some immutable, depending on the interpretation. I like to think about it as immutable blobs/objects like it Git, with unique ids (refs). However, depending on the interpretation, it is mutable, e.g. like the metadata.
+
+Also, it is not obvious yet where to store certain data and how to categorize them and abstract it.
+
+* The file content itself. Mutable, so a reference to it always points to the latest version? Or immutable, so a reference points always to the same data?
+* The current metadata of the file. This is like the author, creation date and also permissions (maybe just use some light version of ACL?). For pictures, also info like what person is in the picture, etc.
+* Persons / contacts.
+* The history of some mutable object (metadata or file or whatever).
+
+The metadata might also be available just as a normal file on the filesystem, e.g. like `${file}.metadata` or so.
+
+In some cases, it is not obvious what the smallest entity is. E.g., some log or list of text comment entries or so, is it a single object or a list of multiple single objects? Some metadata such as comments, are they metadata or are they seperate data objects, maybe with their own metadata?
+
