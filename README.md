@@ -54,3 +54,10 @@ The metadata might also be available just as a normal file on the filesystem, e.
 
 In some cases, it is not obvious what the smallest entity is. E.g., some log or list of text comment entries or so, is it a single object or a list of multiple single objects? Some metadata such as comments, are they metadata or are they seperate data objects, maybe with their own metadata?
 
+---
+
+## Related projects
+
+* [Camliststore](http://camlistore.org/) ([HackerNews](https://news.ycombinator.com/item?id=2156374)), "personal storage system for life", see also the [overview](http://camlistore.org/docs/overview)
+
+
