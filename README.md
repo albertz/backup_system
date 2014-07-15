@@ -32,6 +32,10 @@ When you rename some file/dir or modify some file, and you commit an update to t
 
 To follow the Git naming conventions, every clone/copy of the data (or parts of it) is called a **repository**.
 Every repository will have its own copy of the full history of the backup index.
+It does not need to have all meta-data nor the full copy of all files, only a subset of it.
+It must know about the exact subset, to figure out deletions.
+
+To support recovering from accidental deletions, we can use a tricky idea: For all existing files, the system will also create hardlinks. When you delete a file accidently, you can recover via the hardlink. When you commit a deletion, and you confirm the deletion in the commit, the system can remove the hardlink (or maybe alternatively after some number of commits, or some time delay, or only when running out of disk space).
 
 
 ## Structure
