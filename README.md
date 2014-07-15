@@ -2,6 +2,38 @@
 
 General idea: You have a bunch of systems and/or disks and a bunch of data and you want to keep copies / backups of your data on some of those systems/disks.
 
+In contrast to other backup solutions like [bup](https://github.com/bup/bup) or [Camliststore](http://camlistore.org/),
+this backup system does not save the files seperately from your working copy.
+This is an important distinction and is one of the main reason that this project exists.
+The main idea is that you manage all or files as you normally would do, and this backup system keeps track of the changes of the *tree* of files and the file hashes.
+Thus, it has some version control system, similar to Git, but the file contents themselves are not stored.
+To actually backup some files, the backup system can clone your files, or parts of it.
+
+Then, you might modify your files on different systems, and later want to merge your changes together. Thus, the change history is not simply linear, but can be a complex graph, like in Git.
+
+This basic idea leads to two core functions:
+
+* Versioning system.
+This is used to store the meta-data, the directory tree, the file hashes, and similar stuff.
+But not the file contents!
+We need it to be detailed enough to do clever merges, and to detect all kinds of common modifications, like file/dir renames, etc.
+We call this the versioned **backup index**.
+* Sync / Clone.
+You actually want to copy the file content, because you want to have a backup of it.
+So, any sync or new clone of your data should handle both the version info, meta-data, etc., and the file contents.
+
+(Paragraph for Git experts.)
+With this goal, one possible approach might be to patch up Git directly that it simply does not store Git blobs.
+When you do a new checkout of such repo, it will copy the files based on the existing files of the main repo.
+However, this approach does not work, because we want to support partitioned copies, i.e. not every repo will have all existing dirs/files, probably even all repos.
+Also, we want to store much more meta-data than Git does, e.g. permissions, other forms of hashes, and media related meta data.
+
+When you rename some file/dir or modify some file, and you commit an update to the backup index, it should be able to automatically detect that modification, much like Git does. For doing this, we can support a very similar Git interface to `git commit`.
+
+To follow the Git naming conventions, every clone/copy of the data (or parts of it) is called a **repository**.
+Every repository will have its own copy of the full history of the backup index.
+
+
 ## Structure
 
 I have grouped my data by those general types:
