@@ -5,6 +5,8 @@ General idea: You have a bunch of systems and/or disks and a bunch of data and y
 In contrast to other backup solutions like [bup](https://github.com/bup/bup) or [Camliststore](http://camlistore.org/),
 this backup system does not save the files seperately from your working copy.
 This is an important distinction and is one of the main reason that this project exists.
+This project is more like [git-annex](https://git-annex.branchable.com/). We will discuss the differences later.
+
 The main idea is that you manage all or files as you normally would do, and this backup system keeps track of the changes of the *tree* of files and the file hashes.
 Thus, it has some version control system, similar to Git, but the file contents themselves are not stored.
 To actually backup some files, the backup system can clone your files, or parts of it.
