@@ -39,6 +39,12 @@ It must know about the exact subset, to figure out deletions.
 
 To support recovering from accidental deletions, we can use a tricky idea: For all existing files, the system will also create hardlinks. When you delete a file accidently, you can recover via the hardlink. When you commit a deletion, and you confirm the deletion in the commit, the system can remove the hardlink (or maybe alternatively after some number of commits, or some time delay, or only when running out of disk space).
 
+To come back to git-annex: The basic design of git-annex covers much of what we want. It doesn't store the file contents itself, but it manages the content. And it is all based on Git.
+However, for our purpose, it's too closely forced into the Git infrastructure by using also the Git CLI toolset.
+E.g., it uses the same `.gitignore`, and it is itself a Git repository, living in a `.git` subdirectory.
+Our backup system should be able to manage all files on the disk, which usually includes other Git repositories, and we don't want it to interpret those Git files as usual.
+The logic can become more complex in some cases, e.g. it makes sense so save some auto-generated files, which you normally would not safe in a Git repository. We want that because 
+
 
 ## Structure
 
@@ -97,5 +103,7 @@ In some cases, it is not obvious what the smallest entity is. E.g., some log or 
 ## Related projects
 
 * [Camliststore](http://camlistore.org/) ([HackerNews](https://news.ycombinator.com/item?id=2156374)), "personal storage system for life", see also the [overview](http://camlistore.org/docs/overview)
-
-
+* [bup](https://github.com/bup/bup)
+* [git-annex](https://git-annex.branchable.com/)
+* [unison](http://www.cis.upenn.edu/~bcpierce/unison/)
+* [rsync](http://en.wikipedia.org/wiki/Rsync)
