@@ -103,7 +103,13 @@ In some cases, it is not obvious what the smallest entity is. E.g., some log or 
 ## Related projects
 
 * [Camliststore](http://camlistore.org/) ([HackerNews](https://news.ycombinator.com/item?id=2156374)), "personal storage system for life", see also the [overview](http://camlistore.org/docs/overview)
-* [bup](https://github.com/bup/bup)
+* [bup](https://github.com/bup/bup) ([HackerNews](https://news.ycombinator.com/item?id=8620236))
 * [git-annex](https://git-annex.branchable.com/)
 * [unison](http://www.cis.upenn.edu/~bcpierce/unison/)
 * [rsync](http://en.wikipedia.org/wiki/Rsync)
+* [Attic](https://attic-backup.org/)
+* [Blog post (also about Attic)](http://www.stavros.io/posts/holy-grail-backups/)
+* [duplicity](http://duplicity.nongnu.org/)
+* [Obnam](http://obnam.org/)
+* [ZBackup](http://zbackup.org/)
+
